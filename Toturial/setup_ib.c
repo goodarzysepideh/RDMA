@@ -1,7 +1,9 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <malloc.h>
-
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#include <stdio.h>
 #include "sock.h"
 #include "ib.h"
 #include "debug.h"
@@ -12,112 +14,68 @@ struct IBRes ib_res;
 
 int connect_qp_server ()
 {
-    int			 ret		= 0, n = 0, i = 0;
-    int                  num_peers      = config_info.num_clients;
-    int			 sockfd		= 0;
-    int			*peer_sockfd	= NULL;
-    struct sockaddr_in	 peer_addr;
-    socklen_t		 peer_addr_len	= sizeof(struct sockaddr_in);
-    char sock_buf[64]			= {'\0'};
-    struct QPInfo	*local_qp_info	= NULL;
-    struct QPInfo	*remote_qp_info = NULL;
+    int			ret	      = 0, n = 0;
+    int			sockfd	      = 0;
+    int			peer_sockfd   = 0;
+    struct sockaddr_in	peer_addr;
+    socklen_t		peer_addr_len = sizeof(struct sockaddr_in);
+    char sock_buf[64]		      = {'\0'};
+    struct QPInfo	local_qp_info, remote_qp_info;
 
+    printf("connect_qp_server\n");
     sockfd = sock_create_bind(config_info.sock_port);
     check(sockfd > 0, "Failed to create server socket.");
     listen(sockfd, 5);
 
-    peer_sockfd = (int *) calloc (num_peers, sizeof(int));
-    check (peer_sockfd != NULL, "Failed to allocate peer_sockfd");
-
-    for (i = 0; i < num_peers; i++) {
-	peer_sockfd[i] = accept(sockfd, (struct sockaddr *)&peer_addr,
-				&peer_addr_len);
-	check (peer_sockfd[i] > 0, "Failed to create peer_sockfd[%d]", i);
-    }
+    peer_sockfd = accept(sockfd, (struct sockaddr *)&peer_addr,
+			 &peer_addr_len);
+    check (peer_sockfd > 0, "Failed to create peer_sockfd");
 
     /* init local qp_info */
-    local_qp_info = (struct QPInfo *) calloc (num_peers, 
-					      sizeof(struct QPInfo));
-    check (local_qp_info != NULL, "Failed to allocate local_qp_info");
-
-    for (i = 0; i < num_peers; i++) {
-	local_qp_info[i].lid	= ib_res.port_attr.lid; 
-	local_qp_info[i].qp_num = ib_res.qp[i]->qp_num;
-	local_qp_info[i].rank   = config_info.rank;
-    }
+    local_qp_info.lid	 = ib_res.port_attr.lid; 
+    local_qp_info.qp_num = ib_res.qp->qp_num;
+    local_qp_info.rkey   = ib_res.mr->rkey;
+    local_qp_info.raddr  = (uintptr_t) ib_res.ib_buf;
 
     /* get qp_info from client */
-    remote_qp_info = (struct QPInfo *) calloc (num_peers, 
-					       sizeof(struct QPInfo));
-    check (remote_qp_info != NULL, "Failed to allocate remote_qp_info");
-
-    for (i = 0; i < num_peers; i++) {
-	ret = sock_get_qp_info (peer_sockfd[i], &remote_qp_info[i]);
-	check (ret == 0, "Failed to get qp_info from client[%d]", i);
-    }
+    ret = sock_get_qp_info (peer_sockfd, &remote_qp_info);
+    check (ret == 0, "Failed to get qp_info from client");
     
-    /* send qp_info to client */
-    int peer_ind = -1;
-    int j        = 0;
-    for (i = 0; i < num_peers; i++) {
-	peer_ind = -1;
-	for (j = 0; j < num_peers; j++) {
-	    if (remote_qp_info[j].rank == i) {
-		peer_ind = j;
-		break;
-	    }
-	}
-	ret = sock_set_qp_info (peer_sockfd[i], &local_qp_info[peer_ind]);
-	check (ret == 0, "Failed to send qp_info to client[%d]", peer_ind);
-    }
+    /* send qp_info to client */    
+    ret = sock_set_qp_info (peer_sockfd, &local_qp_info);
+    check (ret == 0, "Failed to send qp_info to client");
 
-    /* change send QP state to RTS */
+    /* store rkey and raddr info */
+    ib_res.rkey  = remote_qp_info.rkey;
+    ib_res.raddr = remote_qp_info.raddr;
+
+    /* change send QP state to RTS */    	
+    ret = modify_qp_to_rts (ib_res.qp, remote_qp_info.qp_num, 
+			    remote_qp_info.lid);
+    check (ret == 0, "Failed to modify qp to rts");
+
     log (LOG_SUB_HEADER, "Start of IB Config");
-    for (i = 0; i < num_peers; i++) {
-	peer_ind = -1;
-	for (j = 0; j < num_peers; j++) {
-	    if (remote_qp_info[j].rank == i) {
-		peer_ind = j;
-		break;
-	    }
-	}
-	ret = modify_qp_to_rts (ib_res.qp[peer_ind], 
-				remote_qp_info[i].qp_num, 
-				remote_qp_info[i].lid);
-	check (ret == 0, "Failed to modify qp[%d] to rts", peer_ind);
-
-	log ("\tqp[%"PRIu32"] <-> qp[%"PRIu32"]", 
-	     ib_res.qp[peer_ind]->qp_num, remote_qp_info[i].qp_num);
-    }
+    log ("\tqp[%"PRIu32"] <-> qp[%"PRIu32"]", 
+	 ib_res.qp->qp_num, remote_qp_info.qp_num);
+    log ("\traddr[%"PRIu64"] <-> raddr[%"PRIu64"]", 
+	 local_qp_info.raddr, ib_res.raddr);
     log (LOG_SUB_HEADER, "End of IB Config");
 
     /* sync with clients */
-    for (i = 0; i < num_peers; i++) {
-	n = sock_read (peer_sockfd[i], sock_buf, sizeof(SOCK_SYNC_MSG));
-	check (n == sizeof(SOCK_SYNC_MSG), "Failed to receive sync from client");
-    }
+    n = sock_read (peer_sockfd, sock_buf, sizeof(SOCK_SYNC_MSG));
+    check (n == sizeof(SOCK_SYNC_MSG), "Failed to receive sync from client");
     
-    for (i = 0; i < num_peers; i++) {
-	n = sock_write (peer_sockfd[i], sock_buf, sizeof(SOCK_SYNC_MSG));
-	check (n == sizeof(SOCK_SYNC_MSG), "Failed to write sync to client");
-    }
+    n = sock_write (peer_sockfd, sock_buf, sizeof(SOCK_SYNC_MSG));
+    check (n == sizeof(SOCK_SYNC_MSG), "Failed to write sync to client");
 	
-    for (i = 0; i < num_peers; i++) {
-	close (peer_sockfd[i]);
-    }
-    free (peer_sockfd);
+    close (peer_sockfd);
     close (sockfd);
     
     return 0;
 
  error:
-    if (peer_sockfd != NULL) {
-	for (i = 0; i < num_peers; i++) {
-	    if (peer_sockfd[i] > 0) {
-		close (peer_sockfd[i]);
-	    }
-	}
-	free (peer_sockfd);
+    if (peer_sockfd > 0) {
+	close (peer_sockfd);
     }
     if (sockfd > 0) {
 	close (sockfd);
@@ -128,109 +86,60 @@ int connect_qp_server ()
 
 int connect_qp_client ()
 {
-    int ret	       = 0, n = 0, i = 0;
-    int num_peers      = ib_res.num_qps;
-    int *peer_sockfd   = NULL;
-    char sock_buf[64]  = {'\0'};
+    int ret	      = 0, n = 0;
+    int peer_sockfd   = 0;
+    char sock_buf[64] = {'\0'};
 
-    struct QPInfo *local_qp_info  = NULL;
-    struct QPInfo *remote_qp_info = NULL;
+    printf("connect_qp_client\n");
 
-    peer_sockfd = (int *) calloc (num_peers, sizeof(int));
-    check (peer_sockfd != NULL, "Failed to allocate peer_sockfd");
+    struct QPInfo local_qp_info, remote_qp_info;
 
-    for (i = 0; i < num_peers; i++) {
-	peer_sockfd[i] = sock_create_connect (config_info.servers[i],
-					      config_info.sock_port);
-	check (peer_sockfd[i] > 0, "Failed to create peer_sockfd[%d]", i);
-    }
+    peer_sockfd = sock_create_connect (config_info.server_name,
+				       config_info.sock_port);
+    check (peer_sockfd > 0, "Failed to create peer_sockfd");
 
-    /* init local qp_info */
-    local_qp_info = (struct QPInfo *) calloc (num_peers, 
-					      sizeof(struct QPInfo));
-    check (local_qp_info != NULL, "Failed to allocate local_qp_info");
-
-    for (i = 0; i < num_peers; i++) {
-	local_qp_info[i].lid     = ib_res.port_attr.lid; 
-	local_qp_info[i].qp_num  = ib_res.qp[i]->qp_num; 
-	local_qp_info[i].rank    = config_info.rank;
-    }
-
-    /* send qp_info to server */
-    for (i = 0; i < num_peers; i++) {
-	ret = sock_set_qp_info (peer_sockfd[i], &local_qp_info[i]);
-	check (ret == 0, "Failed to send qp_info[%d] to server", i);
-    }
+    local_qp_info.lid     = ib_res.port_attr.lid; 
+    local_qp_info.qp_num  = ib_res.qp->qp_num; 
+    local_qp_info.rkey    = ib_res.mr->rkey;
+    local_qp_info.raddr   = (uintptr_t) ib_res.ib_buf;
+   
+    /* send qp_info to server */    
+    ret = sock_set_qp_info (peer_sockfd, &local_qp_info);
+    check (ret == 0, "Failed to send qp_info to server");
 
     /* get qp_info from server */    
-    remote_qp_info = (struct QPInfo *) calloc (num_peers, 
-					       sizeof(struct QPInfo));
-    check (remote_qp_info != NULL, "Failed to allocate remote_qp_info");
+    ret = sock_get_qp_info (peer_sockfd, &remote_qp_info);
+    check (ret == 0, "Failed to get qp_info from server");
+    
+    /* store rkey and raddr info */
+    ib_res.rkey  = remote_qp_info.rkey;
+    ib_res.raddr = remote_qp_info.raddr;
+    
+    /* change QP state to RTS */    	
+    ret = modify_qp_to_rts (ib_res.qp, remote_qp_info.qp_num, 
+			    remote_qp_info.lid);
+    check (ret == 0, "Failed to modify qp to rts");
 
-    for (i = 0; i < num_peers; i++) {
-	ret = sock_get_qp_info (peer_sockfd[i], &remote_qp_info[i]);
-	check (ret == 0, "Failed to get qp_info[%d] from server", i);
-    }
-    
-    /* change QP state to RTS */
-    /* send qp_info to client */
-    int peer_ind = -1;
-    int j        = 0;
     log (LOG_SUB_HEADER, "IB Config");
-    for (i = 0; i < num_peers; i++) {
-	peer_ind = -1;
-	for (j = 0; j < num_peers; j++) {
-	    if (remote_qp_info[j].rank == i) {
-		peer_ind = j;
-		break;
-	    }
-	}
-	ret = modify_qp_to_rts (ib_res.qp[peer_ind], 
-				remote_qp_info[i].qp_num, 
-				remote_qp_info[i].lid);
-	check (ret == 0, "Failed to modify qp[%d] to rts", peer_ind);
-    
-	log ("\tqp[%"PRIu32"] <-> qp[%"PRIu32"]", 
-	     ib_res.qp[peer_ind]->qp_num, remote_qp_info[i].qp_num);
-    }
+    log ("\tqp[%"PRIu32"] <-> qp[%"PRIu32"]", 
+	 ib_res.qp->qp_num, remote_qp_info.qp_num);
+    log ("\traddr[%"PRIu64"] <-> raddr[%"PRIu64"]", 
+	 local_qp_info.raddr, ib_res.raddr);
     log (LOG_SUB_HEADER, "End of IB Config");
 
     /* sync with server */
-    for (i = 0; i < num_peers; i++) {
-	n = sock_write (peer_sockfd[i], sock_buf, sizeof(SOCK_SYNC_MSG));
-	check (n == sizeof(SOCK_SYNC_MSG), "Failed to write sync to client[%d]", i);
-    }
+    n = sock_write (peer_sockfd, sock_buf, sizeof(SOCK_SYNC_MSG));
+    check (n == sizeof(SOCK_SYNC_MSG), "Failed to write sync to client");
     
-    for (i = 0; i < num_peers; i++) {
-	n = sock_read (peer_sockfd[i], sock_buf, sizeof(SOCK_SYNC_MSG));
-	check (n == sizeof(SOCK_SYNC_MSG), "Failed to receive sync from client");
-    }
+    n = sock_read (peer_sockfd, sock_buf, sizeof(SOCK_SYNC_MSG));
+    check (n == sizeof(SOCK_SYNC_MSG), "Failed to receive sync from client");
 
-    for (i = 0; i < num_peers; i++) {
-	close (peer_sockfd[i]);
-    }
-    free (peer_sockfd);
-
-    free (local_qp_info);
-    free (remote_qp_info);
+    close (peer_sockfd);
     return 0;
 
  error:
-    if (peer_sockfd != NULL) {
-	for (i = 0; i < num_peers; i++) {
-	    if (peer_sockfd[i] > 0) {
-		close (peer_sockfd[i]);
-	    }
-	}
-	free (peer_sockfd);
-    }
-
-    if (local_qp_info != NULL) {
-	free (local_qp_info);
-    }
-
-    if (remote_qp_info != NULL) {
-	free (remote_qp_info);
+    if (peer_sockfd > 0) {
+	close (peer_sockfd);
     }
     
     return -1;
@@ -239,16 +148,10 @@ int connect_qp_client ()
 int setup_ib ()
 {
     int	ret		         = 0;
-    int i                        = 0;
     struct ibv_device **dev_list = NULL;    
     memset (&ib_res, 0, sizeof(struct IBRes));
 
-    if (config_info.is_server) {
-	ib_res.num_qps = config_info.num_clients;
-    } else {
-	ib_res.num_qps = config_info.num_servers;
-    }
-
+    printf("setup_ib\n");
     /* get IB device list */
     dev_list = ibv_get_device_list(NULL);
     check(dev_list != NULL, "Failed to get ib device list.");
@@ -266,13 +169,15 @@ int setup_ib ()
     check(ret == 0, "Failed to query IB port information.");
     
     /* register mr */
-    /* set the buf_size twice as large as msg_size * num_concurr_msgs */
-    /* the recv buffer occupies the first half while the sending buffer */
-    /* occupies the second half */
+    /* set the buf_size (msg_size + 1) * num_concurr_msgs */
+    /* the recv buffer is of size msg_size * num_concurr_msgs */
+    /* followed by a sending buffer of size msg_size since we */
     /* assume all msgs are of the same content */
-    ib_res.ib_buf_size = config_info.msg_size * config_info.num_concurr_msgs * ib_res.num_qps;
-    ib_res.ib_buf      = (char *) memalign (4096, ib_res.ib_buf_size);
+    ib_res.ib_buf_size = config_info.msg_size * (config_info.num_concurr_msgs + 1);
+    char *add = (char *)shmat(98307,NULL,0);
+    ib_res.ib_buf      = add;//(char *) memalign (4096, ib_res.ib_buf_size);
     check (ib_res.ib_buf != NULL, "Failed to allocate ib_buf");
+    printf("\n--------look at here: %x--------\n", ib_res.ib_buf);
 
     ib_res.mr = ibv_reg_mr (ib_res.pd, (void *)ib_res.ib_buf,
 			    ib_res.ib_buf_size,
@@ -281,6 +186,13 @@ int setup_ib ()
 			    IBV_ACCESS_REMOTE_WRITE);
     check (ib_res.mr != NULL, "Failed to register mr");
     
+    /* reset receiving buffer to all '0' */
+    //size_t buf_len = config_info.msg_size * config_info.num_concurr_msgs;
+    //memset (ib_res.ib_buf, '\0', buf_len);
+    
+    /* set sending buffer to all 'A' */
+    //memset (ib_res.ib_buf + buf_len, 'A', config_info.msg_size);
+
     /* query IB device attr */
     ret = ibv_query_device(ib_res.ctx, &ib_res.dev_attr);
     check(ret==0, "Failed to query device");
@@ -289,20 +201,11 @@ int setup_ib ()
     ib_res.cq = ibv_create_cq (ib_res.ctx, ib_res.dev_attr.max_cqe, 
 			       NULL, NULL, 0);
     check (ib_res.cq != NULL, "Failed to create cq");
-
-    /* create srq */
-    struct ibv_srq_init_attr srq_init_attr = {
-	.attr.max_wr  = ib_res.dev_attr.max_srq_wr,
-	.attr.max_sge = 1,
-    };
-
-    ib_res.srq = ibv_create_srq (ib_res.pd, &srq_init_attr);
-
+    
     /* create qp */
     struct ibv_qp_init_attr qp_init_attr = {
         .send_cq = ib_res.cq,
         .recv_cq = ib_res.cq,
-	.srq     = ib_res.srq,
         .cap = {
             .max_send_wr = ib_res.dev_attr.max_qp_wr,
             .max_recv_wr = ib_res.dev_attr.max_qp_wr,
@@ -312,14 +215,8 @@ int setup_ib ()
         .qp_type = IBV_QPT_RC,
     };
 
-    ib_res.qp = (struct ibv_qp **) calloc (ib_res.num_qps, 
-					   sizeof(struct ibv_qp *));
-    check (ib_res.qp != NULL, "Failed to allocate qp");
-
-    for (i = 0; i < ib_res.num_qps; i++) {
-	ib_res.qp[i] = ibv_create_qp (ib_res.pd, &qp_init_attr);
-	check (ib_res.qp[i] != NULL, "Failed to create qp[%d]", i);
-    }
+    ib_res.qp = ibv_create_qp (ib_res.pd, &qp_init_attr);
+    check (ib_res.qp != NULL, "Failed to create qp");
 
     /* connect QP */
     if (config_info.is_server) {
@@ -341,19 +238,9 @@ int setup_ib ()
 
 void close_ib_connection ()
 {
-    int i;
-
+    printf("close_ib_connection\n");
     if (ib_res.qp != NULL) {
-	for (i = 0; i < ib_res.num_qps; i++) {
-	    if (ib_res.qp[i] != NULL) {
-		ibv_destroy_qp (ib_res.qp[i]);
-	    }
-	}
-	free (ib_res.qp);
-    }
-
-    if (ib_res.srq != NULL) {
-	ibv_destroy_srq (ib_res.srq);
+	ibv_destroy_qp (ib_res.qp);
     }
 
     if (ib_res.cq != NULL) {
