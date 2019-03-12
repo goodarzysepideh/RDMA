@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <sys/time.h>
+#include <unistd.h>
 
 #include "debug.h"
 #include "ib.h"
@@ -32,14 +33,14 @@ void *server_thread (void *arg)
     uint64_t             raddr        = ib_res.raddr;
     volatile char       *msg_start    = buf_ptr;
     volatile char       *msg_end      = msg_start + msg_size - 1;
-    char                *send_buf_ptr = buf_ptr + buf_size;
+    volatile char       *send_buf_ptr = buf_ptr;
 
     struct timeval      start, end;
     long                ops_count  = 0;
     double              duration   = 0.0;
     double              throughput = 0.0;
 
-    printf("server_thread\n");
+    //printf("server_thread\n");
 
     wc = (struct ibv_wc *) calloc (num_wc, sizeof(struct ibv_wc));
     check (wc != NULL, "thread[%ld]: failed to allocate wc.", thread_id);
@@ -51,35 +52,44 @@ void *server_thread (void *arg)
     ret  = pthread_setaffinity_np (self, sizeof(cpu_set_t), &cpuset);
     check (ret == 0, "thread[%ld]: failed to set thread affinity", thread_id);
 
-    printf("hello1\n");
+    //printf("hello1\n");
     /* pre-post writes */
+    //printf("send_buf_ptr1: %s\n", send_buf_ptr);
     for (i = 0; i < num_concurr_msgs; i++) {
 	post_write_unsignaled (msg_size, lkey, 0, qp, send_buf_ptr, raddr, rkey);
 	buf_offset = (buf_offset + msg_size) % buf_size;
 	raddr      = raddr_base + buf_offset;
     }
     
-    printf("hello2\n");
+    //printf("hello2\n");
     while (ops_count < TOT_NUM_OPS) {
         /* loop till receive a msg from server */
-        //while ((*msg_start != 'A') && (*msg_end != 'A')) {
-        //}	
-
-        /* reset recv buffer */
-        memset ((char *)msg_start, '\0', msg_size);
+        //printf("look here: %s\n" , msg_start);
+        while ((*msg_start != 'A') && (*msg_end != 'A')) {
+        }	
+	//printf("send_buf_ptr2: %s\n", send_buf_ptr);
+       	//printf("hello5\n");
 
         /* send a msg back to the server */
 	ops_count += 1;
         if ((ops_count % SIG_INTERVAL) == 0) {
+	    //printf("hello6\n");
             ret = post_write_signaled (msg_size, lkey, 0, qp, send_buf_ptr, raddr, rkey);
         } else {
+	    //printf("hello7\n");
+	    //printf("heaven is here: %d ----- %d ------ %s ----- %d ----- %d", msg_size, lkey, send_buf_ptr, raddr, rkey);
             ret = post_write_unsignaled (msg_size, lkey, 0, qp, send_buf_ptr, raddr, rkey);
         }
+	/* reset recv buffer */
+	//sleep(5);
+	//memset ((char *)msg_start, '\0', msg_size);
 
         buf_offset = (buf_offset + msg_size) % buf_size;
         msg_start  = buf_ptr + buf_offset;
+	send_buf_ptr = msg_start ;
         msg_end    = msg_start + msg_size - 1;
         raddr      = raddr_base + buf_offset;
+	
 	
         if (ops_count == NUM_WARMING_UP_OPS) {
             gettimeofday (&start, NULL);
@@ -89,7 +99,7 @@ void *server_thread (void *arg)
 	debug ("ops_count = %ld", ops_count);
     }
     gettimeofday (&end, NULL);
-    printf("hello3\n");
+    //printf("hello3\n");
     /* dump statistics */
     duration   = (double)((end.tv_sec - start.tv_sec) * 1000000 +
                           (end.tv_usec - start.tv_usec));
@@ -116,7 +126,7 @@ int run_server ()
     pthread_attr_t       attr;
     void                *status;
 
-    printf("run_server\n");
+    //printf("run_server\n");
 
     pthread_attr_init (&attr);
     pthread_attr_setdetachstate (&attr, PTHREAD_CREATE_JOINABLE);
@@ -124,11 +134,13 @@ int run_server ()
     threads = (pthread_t *) calloc (num_threads, sizeof(pthread_t));
     check (threads != NULL, "Failed to allocate threads.");
 
+    //printf("hello world!\n");
     for (i = 0; i < num_threads; i++) {
 	ret = pthread_create (&threads[i], &attr, server_thread, (void *)i);
 	check (ret == 0, "Failed to create server_thread[%ld]", i);
     }
-
+    
+    //printf("hello world2!\n");
     bool thread_ret_normally = true;
     for (i = 0; i < num_threads; i++) {
         ret = pthread_join (threads[i], &status);
@@ -138,11 +150,12 @@ int run_server ()
             log ("server_thread[%ld]: failed to execute", i);
         }
     }
-
+    
+    //printf("hello world3!\n"); 
     if (thread_ret_normally == false) {
         goto error;
     }
-
+    //printf("hello world4!\n"); 
     pthread_attr_destroy    (&attr);
     free (threads);
 

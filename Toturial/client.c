@@ -2,12 +2,14 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <sys/time.h>
+#include <unistd.h>
 
 #include "debug.h"
 #include "config.h"
 #include "setup_ib.h"
 #include "ib.h"
 #include "client.h"
+
 
 void *client_thread_func (void *arg)
 {
@@ -29,16 +31,16 @@ void *client_thread_func (void *arg)
     uint32_t             rkey	      = ib_res.rkey;
     uint64_t             raddr_base   = ib_res.raddr;
     uint64_t             raddr        = raddr_base;
-    volatile char       *msg_start    = buf_ptr;
-    volatile char       *msg_end      = msg_start + msg_size - 1;
-    char                *send_buf_ptr = buf_ptr + buf_size;
+    volatile char	 *msg_start    = buf_ptr;
+    volatile char        *msg_end      = msg_start + msg_size - 1;
+    volatile char        *send_buf_ptr = buf_ptr;
 
     struct timeval      start, end;
     long                ops_count  = 0;
     double              duration   = 0.0;
     double              throughput = 0.0;
 
-    printf("client_thread_func\n");
+    //printf("client_thread_func\n");
 
     wc = (struct ibv_wc *) calloc (num_wc, sizeof(struct ibv_wc));
     check (wc != NULL, "thread[%ld]: failed to allocate wc.", thread_id);
@@ -50,25 +52,36 @@ void *client_thread_func (void *arg)
     ret  = pthread_setaffinity_np (self, sizeof(cpu_set_t), &cpuset);
     check (ret == 0, "thread[%ld]: failed to set thread affinity", thread_id);
 
-    printf("hello1\n");
+    //printf("hello1\n");
     while (ops_count < TOT_NUM_OPS) {
 	/* loop till receive a msg from server */
-	//while ((*msg_start != 'A') && (*msg_end != 'A')) {
-	//}
-
-	/* reset recv buffer */
-	memset ((char *)msg_start, '\0', msg_size);
+	//printf("look here1: %s\n" , ib_res.ib_buf);	
+        //printf("look here2: %s\n" , buf_ptr);
+	//printf("heaven is here: %d -----", msg_start);
+	while ((*msg_start != 'A') && (*msg_end != 'A')) {
+		//printf("msg_start1: %s\n" , msg_start);
+		sleep(1);
+	}
+	//printf("msg_start2: %s\n" , msg_start);
+	//printf("hello5\n");
+	
 
 	/* send a msg back to the server */
 	ops_count += 1;
 	if ((ops_count % SIG_INTERVAL) == 0) {
+	    //printf("hello6\n");
 	    ret = post_write_signaled (msg_size, lkey, 0, qp, send_buf_ptr, raddr, rkey);
 	} else {
+	    //printf("hello7\n");
 	    ret = post_write_unsignaled (msg_size, lkey, 0, qp, send_buf_ptr, raddr, rkey);
 	}
 	
+	/* reset recv buffer */
+	//memset ((char *)msg_start, '\0', msg_size);
+	
 	buf_offset = (buf_offset + msg_size) % buf_size;
 	msg_start  = buf_ptr + buf_offset;
+	send_buf_ptr = msg_start;
 	msg_end    = msg_start + msg_size - 1;
 	raddr      = raddr_base + buf_offset;
 
@@ -79,7 +92,7 @@ void *client_thread_func (void *arg)
 	n = ibv_poll_cq (cq, num_wc, wc);
 	debug ("ops_count = %ld", ops_count);
     }
-    printf("hello2\n");
+    //printf("hello2\n");
 
     gettimeofday (&end, NULL);
     /* dump statistics */
@@ -108,7 +121,7 @@ int run_client ()
     pthread_attr_t  attr;
     void	   *status;
 
-    printf("run_client\n");
+    //printf("run_client\n");
 
     log (LOG_SUB_HEADER, "Run Client");
     

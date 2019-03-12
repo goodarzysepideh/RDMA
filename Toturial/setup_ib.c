@@ -22,7 +22,7 @@ int connect_qp_server ()
     char sock_buf[64]		      = {'\0'};
     struct QPInfo	local_qp_info, remote_qp_info;
 
-    printf("connect_qp_server\n");
+    //printf("connect_qp_server\n");
     sockfd = sock_create_bind(config_info.sock_port);
     check(sockfd > 0, "Failed to create server socket.");
     listen(sockfd, 5);
@@ -90,7 +90,7 @@ int connect_qp_client ()
     int peer_sockfd   = 0;
     char sock_buf[64] = {'\0'};
 
-    printf("connect_qp_client\n");
+    //printf("connect_qp_client\n");
 
     struct QPInfo local_qp_info, remote_qp_info;
 
@@ -151,7 +151,7 @@ int setup_ib ()
     struct ibv_device **dev_list = NULL;    
     memset (&ib_res, 0, sizeof(struct IBRes));
 
-    printf("setup_ib\n");
+    //printf("setup_ib\n");
     /* get IB device list */
     dev_list = ibv_get_device_list(NULL);
     check(dev_list != NULL, "Failed to get ib device list.");
@@ -177,7 +177,7 @@ int setup_ib ()
     char *add = (char *)shmat(98307,NULL,0);
     ib_res.ib_buf      = add;//(char *) memalign (4096, ib_res.ib_buf_size);
     check (ib_res.ib_buf != NULL, "Failed to allocate ib_buf");
-    printf("\n--------look at here: %x--------\n", ib_res.ib_buf);
+    //printf("\n--------look at here: %d--------\n", ib_res.ib_buf);
 
     ib_res.mr = ibv_reg_mr (ib_res.pd, (void *)ib_res.ib_buf,
 			    ib_res.ib_buf_size,
@@ -187,7 +187,7 @@ int setup_ib ()
     check (ib_res.mr != NULL, "Failed to register mr");
     
     /* reset receiving buffer to all '0' */
-    //size_t buf_len = config_info.msg_size * config_info.num_concurr_msgs;
+    size_t buf_len = config_info.msg_size * config_info.num_concurr_msgs;
     //memset (ib_res.ib_buf, '\0', buf_len);
     
     /* set sending buffer to all 'A' */
@@ -238,7 +238,7 @@ int setup_ib ()
 
 void close_ib_connection ()
 {
-    printf("close_ib_connection\n");
+    //printf("close_ib_connection\n");
     if (ib_res.qp != NULL) {
 	ibv_destroy_qp (ib_res.qp);
     }
