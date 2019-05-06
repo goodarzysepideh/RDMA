@@ -40,7 +40,7 @@ void *client_thread_func (void *arg)
     double              duration   = 0.0;
     double              throughput = 0.0;
 
-    //printf("client_thread_func\n");
+    printf("client_thread_func\n");
 
     wc = (struct ibv_wc *) calloc (num_wc, sizeof(struct ibv_wc));
     check (wc != NULL, "thread[%ld]: failed to allocate wc.", thread_id);
@@ -52,17 +52,19 @@ void *client_thread_func (void *arg)
     ret  = pthread_setaffinity_np (self, sizeof(cpu_set_t), &cpuset);
     check (ret == 0, "thread[%ld]: failed to set thread affinity", thread_id);
 
+    int prev_count = -1 ;
     //printf("hello1\n");
     while (ops_count < TOT_NUM_OPS) {
 	/* loop till receive a msg from server */
 	//printf("look here1: %s\n" , ib_res.ib_buf);	
         //printf("look here2: %s\n" , buf_ptr);
 	//printf("heaven is here: %d -----", msg_start);
-	while ((*msg_start != 'A') && (*msg_end != 'A')) {
+	while (*msg_start == NULL || atoi(msg_start) <= prev_count) {
 		//printf("msg_start1: %s\n" , msg_start);
-		sleep(1);
+		//sleep(1);
 	}
-	//printf("msg_start2: %s\n" , msg_start);
+	prev_count = atoi(msg_start);
+	printf("msg_start: %s\n" , msg_start);
 	//printf("hello5\n");
 	
 

@@ -3,6 +3,8 @@
 #include <stdbool.h>
 #include <sys/time.h>
 #include <unistd.h>
+#include <stdio.h>
+#include <string.h>
 
 #include "debug.h"
 #include "ib.h"
@@ -61,23 +63,26 @@ void *server_thread (void *arg)
 	raddr      = raddr_base + buf_offset;
     }
     
+
+    int prev_count = -1 ;
     //printf("hello2\n");
     while (ops_count < TOT_NUM_OPS) {
         /* loop till receive a msg from server */
         //printf("look here: %s\n" , msg_start);
-        while ((*msg_start != 'A') && (*msg_end != 'A')) {
+        while (*msg_start == NULL || atoi(msg_start) <= prev_count) {
         }	
 	//printf("send_buf_ptr2: %s\n", send_buf_ptr);
        	//printf("hello5\n");
 
         /* send a msg back to the server */
+	prev_count = atoi(msg_start);
 	ops_count += 1;
         if ((ops_count % SIG_INTERVAL) == 0) {
 	    //printf("hello6\n");
             ret = post_write_signaled (msg_size, lkey, 0, qp, send_buf_ptr, raddr, rkey);
         } else {
 	    //printf("hello7\n");
-	    //printf("heaven is here: %d ----- %d ------ %s ----- %d ----- %d", msg_size, lkey, send_buf_ptr, raddr, rkey);
+	    printf("heaven is here: %d ----- %d ------ %s ----- %d ----- %d", msg_size, lkey, send_buf_ptr, raddr, rkey);
             ret = post_write_unsignaled (msg_size, lkey, 0, qp, send_buf_ptr, raddr, rkey);
         }
 	/* reset recv buffer */

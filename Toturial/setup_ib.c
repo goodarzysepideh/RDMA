@@ -188,7 +188,7 @@ int setup_ib ()
     
     /* reset receiving buffer to all '0' */
     size_t buf_len = config_info.msg_size * config_info.num_concurr_msgs;
-    //memset (ib_res.ib_buf, '\0', buf_len);
+    memset (ib_res.ib_buf, '\0', buf_len);
     
     /* set sending buffer to all 'A' */
     //memset (ib_res.ib_buf + buf_len, 'A', config_info.msg_size);
