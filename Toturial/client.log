@@ -1,0 +1,25 @@
+
+================ IB Echo Server ================
+
+
+************ Configuraion ************
+
+is_server                 = false
+msg_size                  = 16
+num_concurr_msgs          = 63
+sock_port                 = 10001
+server_name               = 192.168.0.1
+
+************ End of Configuraion ************
+
+
+************ IB Config ************
+
+	qp[262681] <-> qp[262681]
+	raddr[140204322258944] <-> raddr[140274928402432]
+
+************ End of IB Config ************
+
+
+************ Run Client ************
+

@@ -2,7 +2,7 @@ import sysv_ipc
 msgSize =16
 shmSize =1024
 
-shm = sysv_ipc.SharedMemory(9472)
+shm = sysv_ipc.SharedMemory(2006)
 shm.attach()
 offset = 0;
 i = 0
@@ -20,3 +20,4 @@ while True:
                 break
         #print offset
         offset = (offset + msgSize) % shmSize
+
