@@ -1,8 +1,8 @@
 import sysv_ipc
 
 context = ""
-for i in range(512):
+for i in range(1024):
 	context = context + "A"
-shm = sysv_ipc.SharedMemory(3491)
+shm = sysv_ipc.SharedMemory(9961)
 shm.attach()
-shmem.write(3491, context)
+shm.write(context, 0)

@@ -1,0 +1,21 @@
+
+================ IB Echo Server ================
+
+
+************ Configuraion ************
+
+is_server                 = true
+msg_size                  = 16
+num_concurr_msgs          = 63
+sock_port                 = 10001
+
+************ End of Configuraion ************
+
+
+************ Start of IB Config ************
+
+	qp[262681] <-> qp[262681]
+	raddr[140274928402432] <-> raddr[140204322258944]
+
+************ End of IB Config ************
+
