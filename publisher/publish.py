@@ -1,8 +1,8 @@
 import sysv_ipc
-msgSize =16
-shmSize =1024
+msgSize = 16 #100*1024
+shmSize = 1024 #1024*1024*1024*6.4
 
-shm = sysv_ipc.SharedMemory(5516)
+shm = sysv_ipc.SharedMemory(9106)
 shm.attach()
 offset = 0;
 data = 1

@@ -174,7 +174,7 @@ int setup_ib ()
     /* followed by a sending buffer of size msg_size since we */
     /* assume all msgs are of the same content */
     ib_res.ib_buf_size = config_info.msg_size * (config_info.num_concurr_msgs + 1);
-    char *add = (char *)shmat(131075,NULL,0);
+    char *add = (char *)shmat(98307,NULL,0);
     ib_res.ib_buf      = add;//(char *) memalign (4096, ib_res.ib_buf_size);
     check (ib_res.ib_buf != NULL, "Failed to allocate ib_buf");
     //printf("\n--------look at here: %d--------\n", ib_res.ib_buf);

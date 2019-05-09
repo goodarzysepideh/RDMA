@@ -56,7 +56,7 @@ void *client_thread_func (void *arg)
     //printf("hello1\n");
     while (ops_count < TOT_NUM_OPS) {
 	/* loop till receive a msg from server */
-	//printf("look here1: %s\n" , ib_res.ib_buf);	
+	//printf("look here1: %s\n" , ib_res.ib_buf);
         //printf("look here2: %s\n" , buf_ptr);
 	//printf("heaven is here: %d -----", msg_start);
 	while (*msg_start == NULL || atoi(msg_start) <= prev_count) {
@@ -64,9 +64,9 @@ void *client_thread_func (void *arg)
 		//sleep(1);
 	}
 	prev_count = atoi(msg_start);
-	printf("msg_start: %s\n" , msg_start);
+	//printf("msg_start: %s\n" , msg_start);
 	//printf("hello5\n");
-	
+
 
 	/* send a msg back to the server */
 	ops_count += 1;
@@ -77,10 +77,10 @@ void *client_thread_func (void *arg)
 	    //printf("hello7\n");
 	    ret = post_write_unsignaled (msg_size, lkey, 0, qp, send_buf_ptr, raddr, rkey);
 	}
-	
+
 	/* reset recv buffer */
 	//memset ((char *)msg_start, '\0', msg_size);
-	
+
 	buf_offset = (buf_offset + msg_size) % buf_size;
 	msg_start  = buf_ptr + buf_offset;
 	send_buf_ptr = msg_start;
@@ -98,7 +98,7 @@ void *client_thread_func (void *arg)
 
     gettimeofday (&end, NULL);
     /* dump statistics */
-    duration   = (double)((end.tv_sec - start.tv_sec) * 1000000 + 
+    duration   = (double)((end.tv_sec - start.tv_sec) * 1000000 +
 			  (end.tv_usec - start.tv_usec));
     throughput = (double)(ops_count) / duration;
     log ("thread[%ld]: throughput = %f (Mops/s)",  thread_id, throughput);
@@ -118,7 +118,7 @@ int run_client ()
     int		ret	    = 0;
     long	num_threads = 1;
     long	i	    = 0;
-    
+
     pthread_t	   *client_threads = NULL;
     pthread_attr_t  attr;
     void	   *status;
@@ -126,7 +126,7 @@ int run_client ()
     //printf("run_client\n");
 
     log (LOG_SUB_HEADER, "Run Client");
-    
+
     /* initialize threads */
     pthread_attr_init (&attr);
     pthread_attr_setdetachstate (&attr, PTHREAD_CREATE_JOINABLE);
@@ -135,7 +135,7 @@ int run_client ()
     check (client_threads != NULL, "Failed to allocate client_threads.");
 
     for (i = 0; i < num_threads; i++) {
-	ret = pthread_create (&client_threads[i], &attr, 
+	ret = pthread_create (&client_threads[i], &attr,
 			      client_thread_func, (void *)i);
 	check (ret == 0, "Failed to create client_thread[%ld]", i);
     }
@@ -162,7 +162,8 @@ int run_client ()
     if (client_threads != NULL) {
         free (client_threads);
     }
-    
+
     pthread_attr_destroy (&attr);
     return -1;
 }
+

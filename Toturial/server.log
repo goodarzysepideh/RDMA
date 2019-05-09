@@ -7,15 +7,10 @@
 is_server                 = true
 msg_size                  = 16
 num_concurr_msgs          = 63
-sock_port                 = 10002
+sock_port                 = 10000
 
 ************ End of Configuraion ************
 
 
-************ Start of IB Config ************
-
-	qp[262682] <-> qp[262682]
-	raddr[139738050985984] <-> raddr[139870393466880]
-
-************ End of IB Config ************
+================ Run Finished ================
 

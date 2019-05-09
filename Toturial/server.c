@@ -58,11 +58,11 @@ void *server_thread (void *arg)
     /* pre-post writes */
     //printf("send_buf_ptr1: %s\n", send_buf_ptr);
     for (i = 0; i < num_concurr_msgs; i++) {
-	post_write_unsignaled (msg_size, lkey, 0, qp, send_buf_ptr, raddr, rkey);
-	buf_offset = (buf_offset + msg_size) % buf_size;
-	raddr      = raddr_base + buf_offset;
+    	post_write_unsignaled (msg_size, lkey, 0, qp, send_buf_ptr, raddr, rkey);
+    	buf_offset = (buf_offset + msg_size) % buf_size;
+    	raddr      = raddr_base + buf_offset;
     }
-    
+
 
     int prev_count = -1 ;
     //printf("hello2\n");
@@ -70,7 +70,7 @@ void *server_thread (void *arg)
         /* loop till receive a msg from server */
         //printf("look here: %s\n" , msg_start);
         while (*msg_start == NULL || atoi(msg_start) <= prev_count) {
-        }	
+        }
 	//printf("send_buf_ptr2: %s\n", send_buf_ptr);
        	//printf("hello5\n");
 
@@ -82,7 +82,7 @@ void *server_thread (void *arg)
             ret = post_write_signaled (msg_size, lkey, 0, qp, send_buf_ptr, raddr, rkey);
         } else {
 	    //printf("hello7\n");
-	    printf("heaven is here: %d ----- %d ------ %s ----- %d ----- %d", msg_size, lkey, send_buf_ptr, raddr, rkey);
+	    //printf("heaven is here: %d ----- %d ------ %s ----- %d ----- %d", msg_size, lkey, send_buf_ptr, raddr, rkey);
             ret = post_write_unsignaled (msg_size, lkey, 0, qp, send_buf_ptr, raddr, rkey);
         }
 	/* reset recv buffer */
@@ -94,8 +94,8 @@ void *server_thread (void *arg)
 	send_buf_ptr = msg_start ;
         msg_end    = msg_start + msg_size - 1;
         raddr      = raddr_base + buf_offset;
-	
-	
+
+
         if (ops_count == NUM_WARMING_UP_OPS) {
             gettimeofday (&start, NULL);
         }
@@ -144,7 +144,7 @@ int run_server ()
 	ret = pthread_create (&threads[i], &attr, server_thread, (void *)i);
 	check (ret == 0, "Failed to create server_thread[%ld]", i);
     }
-    
+
     //printf("hello world2!\n");
     bool thread_ret_normally = true;
     for (i = 0; i < num_threads; i++) {
@@ -155,12 +155,12 @@ int run_server ()
             log ("server_thread[%ld]: failed to execute", i);
         }
     }
-    
-    //printf("hello world3!\n"); 
+
+    //printf("hello world3!\n");
     if (thread_ret_normally == false) {
         goto error;
     }
-    //printf("hello world4!\n"); 
+    //printf("hello world4!\n");
     pthread_attr_destroy    (&attr);
     free (threads);
 
@@ -171,6 +171,7 @@ int run_server ()
         free (threads);
     }
     pthread_attr_destroy    (&attr);
-    
+
     return -1;
 }
+
