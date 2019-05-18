@@ -52,18 +52,19 @@ void *client_thread_func (void *arg)
     ret  = pthread_setaffinity_np (self, sizeof(cpu_set_t), &cpuset);
     check (ret == 0, "thread[%ld]: failed to set thread affinity", thread_id);
 
-    int prev_count = -1 ;
+    //int prev_count = -1 ;
     //printf("hello1\n");
     while (ops_count < TOT_NUM_OPS) {
 	/* loop till receive a msg from server */
 	//printf("look here1: %s\n" , ib_res.ib_buf);
         //printf("look here2: %s\n" , buf_ptr);
 	//printf("heaven is here: %d -----", msg_start);
-	while (*msg_start == NULL || atoi(msg_start) <= prev_count) {
-		//printf("msg_start1: %s\n" , msg_start);
+	while (strcmp(msg_start, "" ) == 0) {
+		//printf("ridim");
 		//sleep(1);
 	}
-	prev_count = atoi(msg_start);
+        printf("hello5\n");
+	//prev_count = atoi(msg_start);
 	//printf("msg_start: %s\n" , msg_start);
 	//printf("hello5\n");
 
@@ -166,4 +167,5 @@ int run_client ()
     pthread_attr_destroy (&attr);
     return -1;
 }
+
 

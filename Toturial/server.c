@@ -70,10 +70,11 @@ void *server_thread (void *arg)
         /* loop till receive a msg from server */
         //printf("look here: %s\n" , msg_start);
         while (strcmp(msg_start , "") == 0) {
-            printf("ridim");
+            //printf("ridim");
         }
+        //prev_count = atoi(counter);
 	//printf("send_buf_ptr2: %s\n", send_buf_ptr);
-       	//printf("hello5\n");
+       	printf("hello5\n");
 
         /* send a msg back to the server */
 	//prev_count = atoi(msg_start);
