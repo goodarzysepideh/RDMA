@@ -1,13 +1,15 @@
 import sysv_ipc
-msgSize = 16 #100*1024
-shmSize = 1024 #1024*1024*1024*6.4
+msgSize = 1024
+shmSize = 65536
 
-shm = sysv_ipc.SharedMemory(9106)
+shm = sysv_ipc.SharedMemory(999)
 shm.attach()
 offset = 0;
-data = 1
+counter = 10 ** 9
+helper = 1
 while True:
-        shm.write(str(data), offset)
+        shm.write(str(counter) + ('a' * (msgSize - 10)), offset)
         offset = (offset + msgSize) % shmSize
-        data = data+1
-
+        #print counter
+        counter = counter+1
+        helper = helper+1

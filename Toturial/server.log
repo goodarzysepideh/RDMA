@@ -5,12 +5,18 @@
 ************ Configuraion ************
 
 is_server                 = true
-msg_size                  = 16
+msg_size                  = 1024
 num_concurr_msgs          = 63
-sock_port                 = 10000
+sock_port                 = 10001
 
 ************ End of Configuraion ************
 
 
-================ Run Finished ================
+************ Start of IB Config ************
 
+	qp[585] <-> qp[583]
+	raddr[139630181093376] <-> raddr[140280292851712]
+
+************ End of IB Config ************
+
+thread[0]: throughput = 7.705680 (Mops/s)

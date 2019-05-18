@@ -64,18 +64,19 @@ void *server_thread (void *arg)
     }
 
 
-    int prev_count = -1 ;
+    //int prev_count = -1 ;
     //printf("hello2\n");
     while (ops_count < TOT_NUM_OPS) {
         /* loop till receive a msg from server */
         //printf("look here: %s\n" , msg_start);
-        while (*msg_start == NULL || atoi(msg_start) <= prev_count) {
+        while (strcmp(msg_start , "") == 0) {
+            printf("ridim");
         }
 	//printf("send_buf_ptr2: %s\n", send_buf_ptr);
        	//printf("hello5\n");
 
         /* send a msg back to the server */
-	prev_count = atoi(msg_start);
+	//prev_count = atoi(msg_start);
 	ops_count += 1;
         if ((ops_count % SIG_INTERVAL) == 0) {
 	    //printf("hello6\n");
